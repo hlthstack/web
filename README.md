@@ -19,6 +19,8 @@ For the REST API (bookings, benefits, webhooks and so on) see the [hlthstack int
 - [Security notes](#security-notes)
 - [Examples](#examples)
 
+For employers who want their employees to sign in with their own identity provider (Okta, Entra ID and so on), see [SAML 2.0 single sign-on](docs/saml.md).
+
 ## How SSO works
 
 ```mermaid
