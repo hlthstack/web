@@ -35,6 +35,8 @@ Both work with the same IdP configuration.
 ## What to configure in your IdP
 
 hlthstack gives you a company slug for each environment. Replace `<company-slug>` below with it.
+If your company is part of a group, the ACS URL uses the group's (parent company's) slug, which
+hlthstack also gives you; the sign-in link uses your own.
 hlthstack sends you the exact URLs at onboarding; use those if they differ.
 
 | Setting (names vary by IdP) | Production | Staging |
