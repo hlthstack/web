@@ -4,7 +4,7 @@ Embed the hlthstack web app inside your own app or website and sign your users i
 
 The hlthstack PWA is a progressive web app that gives your users their health benefits: annual health checkups, lab tests, doctor consultations, pharmacy, mental wellness, dental and vision care, vaccinations and more. You can open it in a WebView inside your Android or iOS app, or in a browser tab from your website. Your users never see a login screen: your backend vouches for them with an encrypted, short-lived payload.
 
-For the REST API (bookings, benefits, webhooks and so on) see the [hlthstack integration guide](https://github.com/hlthstack/integration-guide). For hlthstack itself, see [hlthstack.io](https://www.hlthstack.io/).
+For the REST API (bookings, benefits, webhooks and so on) see the [hlthstack integration guide](https://github.com/hlthstack/integration-guide), the [API reference](https://developers.hlthstack.io) and the [Postman docs](https://documenter.getpostman.com/view/32733686/2sBYHbqvwh). For hlthstack itself, see [hlthstack.io](https://www.hlthstack.io/).
 
 ## Contents
 
