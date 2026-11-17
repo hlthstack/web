@@ -2,28 +2,55 @@
 
 Embed the hlthstack web app inside your own app or website and sign your users in with single sign-on (SSO).
 
-The hlthstack PWA is a progressive web app that gives your users their health benefits: annual health checkups, lab tests, doctor consultations, pharmacy, mental wellness, dental and vision care, vaccinations and more. You can open it in a WebView inside your Android or iOS app, or in a browser tab from your website. Your users never see a login screen: your backend vouches for them with an encrypted, short-lived payload.
-
-For the REST API (bookings, benefits, webhooks and so on) see the [hlthstack integration guide](https://github.com/hlthstack/integration-guide), the [API reference](https://developers.hlthstack.io) and the [Postman docs](https://documenter.getpostman.com/view/32733686/2sBYHbrFjt). For hlthstack itself, see [hlthstack.io](https://www.hlthstack.io/).
-
-**PWA or REST API?** Choose the PWA when you want every hlthstack service through one integration: you build no screens, and new features reach your users without changes on your side. Choose the REST API when you want your own screens and a native look and feel, and are ready to integrate each service yourself. Many partners use both.
-
 ## Contents
 
-- [How SSO works](#how-sso-works)
-- [What hlthstack gives you](#what-hlthstack-gives-you)
-- [Environments](#environments)
-- [Payload](#payload)
-- [Encrypting the payload](#encrypting-the-payload)
-- [Launching the PWA](#launching-the-pwa)
-- [Errors](#errors)
-- [Embedding tips](#embedding-tips)
-- [Security notes](#security-notes)
-- [Examples](#examples)
+1. [Overview](#1-overview)
+2. [Onboarding checklist](#2-onboarding-checklist)
+3. [How SSO works](#3-how-sso-works)
+4. [Environments](#4-environments)
+5. [Payload](#5-payload)
+6. [Encrypting the payload](#6-encrypting-the-payload)
+7. [Launching the PWA](#7-launching-the-pwa)
+8. [Embedding tips](#8-embedding-tips)
+9. [Errors and troubleshooting](#9-errors-and-troubleshooting)
+10. [Security notes](#10-security-notes)
+11. [Examples](#11-examples)
 
 For employers who want their employees to sign in with their own identity provider (Okta, Entra ID and so on), see [SAML 2.0 single sign-on](docs/saml.md).
 
-## How SSO works
+## 1. Overview
+
+The hlthstack PWA is a progressive web app that gives your users their health benefits: annual health checkups, lab tests, doctor consultations, pharmacy, mental wellness, dental and vision care, vaccinations and more. You can open it in a WebView inside your Android or iOS app, or in a browser tab from your website. Your users never see a login screen: your backend vouches for them with an encrypted, short-lived payload.
+
+**PWA or REST API?** Choose the PWA when you want every hlthstack service through one integration: you build no screens, and new features reach your users without changes on your side. Choose the REST API when you want your own screens and a native look and feel, and are ready to integrate each service yourself. Many partners use both.
+
+For the REST API (bookings, benefits, webhooks and so on) see the [hlthstack integration guide](https://github.com/hlthstack/integration-guide), the [API reference](https://developers.hlthstack.io) and the [Postman docs](https://documenter.getpostman.com/view/32733686/2sBYHbrFjt). For hlthstack itself, see [hlthstack.io](https://www.hlthstack.io/).
+
+## 2. Onboarding checklist
+
+### What hlthstack gives you
+
+hlthstack issues these per environment. Staging and production values are different.
+
+| Item | Used where | Notes |
+|---|---|---|
+| `slug` | Launch URL path | Identifies you as an integration partner. |
+| `entity_id` | Payload | Identifies the employer, group or programme the user belongs to. You may get more than one; each must be registered under your `slug`. |
+| `encoded_key` | Encryption | Base64. Decodes to a 32-byte AES-256 key. |
+| `encoded_iv` | Encryption | Base64. Decodes to the GCM IV (nonce). Use it exactly as issued. |
+
+Treat `encoded_key` and `encoded_iv` as secrets (see [Security notes](#security-notes)).
+
+### What to ask hlthstack to confirm
+
+Ask hlthstack to confirm:
+
+- which pages (deeplinks) are enabled for your plan, so you only link to those;
+- how long a PWA session lasts, what the user sees when it times out, and how they get back to your app from the PWA;
+- which theming options (colours, logo) are available for your integration.
+
+<a id="how-sso-works"></a>
+## 3. How SSO works
 
 ```mermaid
 sequenceDiagram
@@ -51,26 +78,8 @@ sequenceDiagram
 
 The whole trip, from the moment you set `requested_at` until the PWA's sign-in page reaches the backend, must take **less than 30 seconds**. Encrypt just before launching. Never pre-generate, cache or reuse a payload.
 
-## What hlthstack gives you
-
-hlthstack issues these per environment. Staging and production values are different.
-
-| Item | Used where | Notes |
-|---|---|---|
-| `slug` | Launch URL path | Identifies you as an integration partner. |
-| `entity_id` | Payload | Identifies the employer, group or programme the user belongs to. You may get more than one; each must be registered under your `slug`. |
-| `encoded_key` | Encryption | Base64. Decodes to a 32-byte AES-256 key. |
-| `encoded_iv` | Encryption | Base64. Decodes to the GCM IV (nonce). Use it exactly as issued. |
-
-Treat `encoded_key` and `encoded_iv` as secrets (see [Security notes](#security-notes)).
-
-Also ask hlthstack to confirm:
-
-- which pages (deeplinks) are enabled for your plan, so you only link to those;
-- how long a PWA session lasts, what the user sees when it times out, and how they get back to your app from the PWA;
-- which theming options (colours, logo) are available for your integration.
-
-## Environments
+<a id="environments"></a>
+## 4. Environments
 
 | Environment | PWA host | Launch URL |
 |---|---|---|
@@ -81,7 +90,10 @@ Integrate and test against staging first, with your staging `slug`, `entity_id`,
 
 Staging is separate from production: users and sessions you create there never touch production data.
 
-## Payload
+<a id="payload"></a>
+## 5. Payload
+
+### Fields
 
 The payload is a JSON object, serialised to a UTF-8 string and then encrypted. Field names are case-sensitive.
 
@@ -102,11 +114,6 @@ The payload is a JSON object, serialised to a UTF-8 string and then encrypted. F
 | `selected_plan` | No | string | The plan ID of one of the user's active plans to open the session against. Must be a string. |
 | `deeplink` | No | string | The page to open after sign-in. See [Deeplinks](#deeplinks). Defaults to the home page. |
 
-**How the user is matched.** hlthstack looks for the user by `email` within the entity:
-
-- **Standard entities.** If no user with that email exists, one is created from the payload (`first_name`, `last_name`, `member_id`, `gender`, `dob`, `mobile`, `grade`, `department`). Profile fields are only used at creation; sending different values on later launches does not change an existing user. Always send the same email for the same person: if it changes, no match is found and a second user is created.
-- **Pre-registration-only entities.** Some entities are set up so that users are registered in advance (for example through the REST API) and SSO never creates anyone. The user is matched by `email`, or, if that finds no one, by `member_id` (case-insensitive, compared with the employee ID given at registration). Only `entity_id`, `requested_at` and `email` or `member_id` are needed. If no active registered user matches, sign-in fails with "Customer is not registered" (see [Errors](#errors)). hlthstack tells you whether your entity works this way.
-
 Example:
 
 ```json
@@ -125,6 +132,13 @@ Example:
   "requested_at": 1794285072
 }
 ```
+
+### How the user is matched
+
+hlthstack looks for the user by `email` within the entity:
+
+- **Standard entities.** If no user with that email exists, one is created from the payload (`first_name`, `last_name`, `member_id`, `gender`, `dob`, `mobile`, `grade`, `department`). Profile fields are only used at creation; sending different values on later launches does not change an existing user. Always send the same email for the same person: if it changes, no match is found and a second user is created.
+- **Pre-registration-only entities.** Some entities are set up so that users are registered in advance (for example through the REST API) and SSO never creates anyone. The user is matched by `email`, or, if that finds no one, by `member_id` (case-insensitive, compared with the employee ID given at registration). Only `entity_id`, `requested_at` and `email` or `member_id` are needed. If no active registered user matches, sign-in fails with "Customer is not registered" (see [Errors](#errors)). hlthstack tells you whether your entity works this way.
 
 ### Plans
 
@@ -190,7 +204,8 @@ Set `deeplink` to one of these values to open a specific page. Any other value o
 
 For `booking-history?orderId=<order-id>`, use the order ID hlthstack returned when the booking was made. The PWA opens the matching appointment, pharmacy order or gym booking; an unknown ID opens the home page.
 
-## Encrypting the payload
+<a id="encrypting-the-payload"></a>
+## 6. Encrypting the payload
 
 | Parameter | Value |
 |---|---|
@@ -239,7 +254,8 @@ plaintext = decipher.update(Base64.urlsafe_decode64(message)) + decipher.final
 
 Also check before you encrypt that `entity_id`, `requested_at` and `email` (or `member_id`, for pre-registered users) are present, and `first_name` for users who may be new. A bad payload is not reported to your server; the user sees the error on the PWA's sign-in page.
 
-## Launching the PWA
+<a id="launching-the-pwa"></a>
+## 7. Launching the PWA
 
 ```
 POST https://pwa.hlthstack.io/pwa-sso/<slug>
@@ -249,8 +265,6 @@ message=<message>&auth_tag=<auth_tag>
 ```
 
 The request must be a top-level navigation (the user's browser or WebView loads it), not a background `fetch` or server-to-server call, because the `302` response has to take the user into the PWA. URL-encode both values in the form body as you would any form field. The launch endpoint only accepts `POST`.
-
-To test by hand, generate `message` and `auth_tag` with one of the [examples](#examples) and post them from a browser form within 30 seconds. A tool such as curl or Postman only sees the `302`; the sign-in result is shown on the PWA page.
 
 ### From a website
 
@@ -291,34 +305,12 @@ webView.load(request)
 
 In all three cases `message` and `auth_tag` come from your backend, fetched just before launch.
 
-## Errors
+### Testing by hand
 
-The launch endpoint always answers with the `302` redirect. Validation happens when the PWA's sign-in page sends the payload on to the hlthstack backend, so failures are shown to the user on that page, together with a **Try again** button. Your server does not receive the error. Use staging to test each case below.
+Generate `message` and `auth_tag` with one of the [examples](#examples) and post them from a browser form within 30 seconds. A tool such as curl or Postman only sees the `302`; the sign-in result is shown on the PWA page.
 
-| Cause | Message shown |
-|---|---|
-| `message` or `auth_tag` missing | Missing params for requested resource |
-| Unknown `slug`, or no entity set up for it yet | Requested resource cannot be found |
-| Decryption failed: wrong key or IV, wrong environment, `message` or `auth_tag` altered or truncated (for example a `+` sent unencoded in the form body), or the plaintext is not valid JSON | Unable to process the login request, please contact your HR. |
-| `requested_at` missing, or more than 30 seconds old when the PWA reached the backend | Request expired. Please try again |
-| `entity_id` unknown, or registered under a different `slug` | Entity is not registered … Please contact support team |
-| Pre-registration-only entity and no active registered user matches `email` or `member_id` | Customer is not registered … Please contact partner |
-| The user could not be created (for example, invalid data) | The validation message |
-| `selected_plan` is not a string | selected_plan must be a string |
-| `selected_plan` is not one of the user's active plans | Selected plan not found |
-| Anything else | Something went wrong |
-
-**Try again** resends the same payload, so it only helps within the 30-second window. After an expiry, send the user back through your launch flow to get a fresh payload.
-
-Common causes:
-
-- **Request expired:** queues, batch jobs and cold starts can easily take 30 seconds. Encrypt in the same request that launches the PWA.
-- **Entity is not registered:** check that the `entity_id` belongs to the environment you are launching; staging values don't work in production, and the reverse.
-- **Unable to process the login request:** Base64-decode `encoded_key` and `encoded_iv` before use, rather than passing the Base64 strings to the cipher.
-
-For anything else, contact hlthstack through [hlthstack.io](https://www.hlthstack.io/) with the environment, your `slug`, the `entity_id` and the time of the failed launch. Never send `message`, `auth_tag`, the key or the IV.
-
-## Embedding tips
+<a id="embedding-tips"></a>
+## 8. Embedding tips
 
 The PWA is a regular web app; it needs no SDK or JavaScript bridge from you. These settings let all of its features work inside a WebView.
 
@@ -349,7 +341,40 @@ The PWA is a regular web app; it needs no SDK or JavaScript bridge from you. The
 
 No extra setup is needed. Post the launch form from your page (see [From a website](#from-a-website)); add `target="_blank"` for a new tab.
 
-## Security notes
+<a id="errors"></a>
+## 9. Errors and troubleshooting
+
+The launch endpoint always answers with the `302` redirect. Validation happens when the PWA's sign-in page sends the payload on to the hlthstack backend, so failures are shown to the user on that page, together with a **Try again** button. Your server does not receive the error. Use staging to test each case below.
+
+| Cause | Message shown |
+|---|---|
+| `message` or `auth_tag` missing | Missing params for requested resource |
+| Unknown `slug`, or no entity set up for it yet | Requested resource cannot be found |
+| Decryption failed: wrong key or IV, wrong environment, `message` or `auth_tag` altered or truncated (for example a `+` sent unencoded in the form body), or the plaintext is not valid JSON | Unable to process the login request, please contact your HR. |
+| `requested_at` missing, or more than 30 seconds old when the PWA reached the backend | Request expired. Please try again |
+| `entity_id` unknown, or registered under a different `slug` | Entity is not registered … Please contact support team |
+| Pre-registration-only entity and no active registered user matches `email` or `member_id` | Customer is not registered … Please contact partner |
+| The user could not be created (for example, invalid data) | The validation message |
+| `selected_plan` is not a string | selected_plan must be a string |
+| `selected_plan` is not one of the user's active plans | Selected plan not found |
+| Anything else | Something went wrong |
+
+### Try again
+
+**Try again** resends the same payload, so it only helps within the 30-second window. After an expiry, send the user back through your launch flow to get a fresh payload.
+
+### Common causes
+
+- **Request expired:** queues, batch jobs and cold starts can easily take 30 seconds. Encrypt in the same request that launches the PWA.
+- **Entity is not registered:** check that the `entity_id` belongs to the environment you are launching; staging values don't work in production, and the reverse.
+- **Unable to process the login request:** Base64-decode `encoded_key` and `encoded_iv` before use, rather than passing the Base64 strings to the cipher.
+
+### Contacting hlthstack
+
+For anything else, contact hlthstack through [hlthstack.io](https://www.hlthstack.io/) with the environment, your `slug`, the `entity_id` and the time of the failed launch. Never send `message`, `auth_tag`, the key or the IV.
+
+<a id="security-notes"></a>
+## 10. Security notes
 
 - **Encrypt on your server.** Never put `encoded_key` or `encoded_iv` in a mobile app, a web page or any other client. Anyone who has them can sign in as any of your users. Your app should ask your backend for a fresh `message` and `auth_tag` for the user who is already signed in to your app.
 - Only build a payload for the user your own authentication has verified. Never take the email or member ID from client input.
@@ -358,7 +383,8 @@ No extra setup is needed. Post the launch form from your page (see [From a websi
 - Do not log `message` or `auth_tag`, and do not put them in analytics or crash reports.
 - Use HTTPS everywhere; only load the hlthstack hosts listed in [Environments](#environments) in your WebView.
 
-## Examples
+<a id="examples"></a>
+## 11. Examples
 
 | Language | File | Run |
 |---|---|---|
