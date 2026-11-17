@@ -6,6 +6,8 @@ The hlthstack PWA is a progressive web app that gives your users their health be
 
 For the REST API (bookings, benefits, webhooks and so on) see the [hlthstack integration guide](https://github.com/hlthstack/integration-guide), the [API reference](https://developers.hlthstack.io) and the [Postman docs](https://documenter.getpostman.com/view/32733686/2sBYHbqvwh). For hlthstack itself, see [hlthstack.io](https://www.hlthstack.io/).
 
+**PWA or REST API?** Choose the PWA when you want every hlthstack service through one integration: you build no screens, and new features reach your users without changes on your side. Choose the REST API when you want your own screens and a native look and feel, and are ready to integrate each service yourself. Many partners use both.
+
 ## Contents
 
 - [How SSO works](#how-sso-works)
@@ -62,6 +64,12 @@ hlthstack issues these per environment. Staging and production values are differ
 
 Treat `encoded_key` and `encoded_iv` as secrets (see [Security notes](#security-notes)).
 
+Also ask hlthstack to confirm:
+
+- which pages (deeplinks) are enabled for your plan, so you only link to those;
+- how long a PWA session lasts, what the user sees when it times out, and how they get back to your app from the PWA;
+- which theming options (colours, logo) are available for your integration.
+
 ## Environments
 
 | Environment | PWA host | Launch URL |
@@ -70,6 +78,8 @@ Treat `encoded_key` and `encoded_iv` as secrets (see [Security notes](#security-
 | Production | `https://pwa.hlthstack.io` | `https://pwa.hlthstack.io/pwa-sso/<slug>` |
 
 Integrate and test against staging first, with your staging `slug`, `entity_id`, key and IV. Switch all four together when you move to production.
+
+Staging is separate from production: users and sessions you create there never touch production data.
 
 ## Payload
 
@@ -94,7 +104,7 @@ The payload is a JSON object, serialised to a UTF-8 string and then encrypted. F
 
 **How the user is matched.** hlthstack looks for the user by `email` within the entity:
 
-- **Standard entities.** If no user with that email exists, one is created from the payload (`first_name`, `last_name`, `member_id`, `gender`, `dob`, `mobile`, `grade`, `department`). Profile fields are only used at creation; sending different values on later launches does not change an existing user.
+- **Standard entities.** If no user with that email exists, one is created from the payload (`first_name`, `last_name`, `member_id`, `gender`, `dob`, `mobile`, `grade`, `department`). Profile fields are only used at creation; sending different values on later launches does not change an existing user. Always send the same email for the same person: if it changes, no match is found and a second user is created.
 - **Pre-registration-only entities.** Some entities are set up so that users are registered in advance (for example through the REST API) and SSO never creates anyone. The user is matched by `email`, or, if that finds no one, by `member_id` (case-insensitive, compared with the employee ID given at registration). Only `entity_id`, `requested_at` and `email` or `member_id` are needed. If no active registered user matches, sign-in fails with "Customer is not registered" (see [Errors](#errors)). hlthstack tells you whether your entity works this way.
 
 Example:
@@ -138,7 +148,7 @@ Each entry of `voluntary_plan_ids` is either a plan ID string, or an object:
 
 ### Deeplinks
 
-Set `deeplink` to one of these values to open a specific page. Any other value opens the home page.
+Set `deeplink` to one of these values to open a specific page. Any other value opens the home page. Not every page is available on every plan; ask hlthstack which are enabled for yours. Keep deeplink values in code or configuration rather than free text: a misspelt value is not reported, it just opens the home page.
 
 | Page | `deeplink` |
 |---|---|
@@ -216,6 +226,19 @@ auth_tag = Base64.urlsafe_encode64(cipher.auth_tag)
 
 Complete Node.js, Python, Ruby and Java versions are in [`examples/`](examples).
 
+Before your first launch, decrypt your own output locally with the same key and IV and check you get your JSON back. This is how hlthstack decrypts it:
+
+```ruby
+decipher = OpenSSL::Cipher.new('aes-256-gcm')
+decipher.decrypt
+decipher.key      = Base64.decode64(encoded_key)
+decipher.iv       = Base64.decode64(encoded_iv)
+decipher.auth_tag = Base64.urlsafe_decode64(auth_tag)
+plaintext = decipher.update(Base64.urlsafe_decode64(message)) + decipher.final
+```
+
+Also check before you encrypt that `entity_id`, `requested_at` and `email` (or `member_id`, for pre-registered users) are present, and `first_name` for users who may be new. A bad payload is not reported to your server; the user sees the error on the PWA's sign-in page.
+
 ## Launching the PWA
 
 ```
@@ -226,6 +249,8 @@ message=<message>&auth_tag=<auth_tag>
 ```
 
 The request must be a top-level navigation (the user's browser or WebView loads it), not a background `fetch` or server-to-server call, because the `302` response has to take the user into the PWA. URL-encode both values in the form body as you would any form field. The launch endpoint only accepts `POST`.
+
+To test by hand, generate `message` and `auth_tag` with one of the [examples](#examples) and post them from a browser form within 30 seconds. A tool such as curl or Postman only sees the `302`; the sign-in result is shown on the PWA page.
 
 ### From a website
 
@@ -285,6 +310,14 @@ The launch endpoint always answers with the `302` redirect. Validation happens w
 
 **Try again** resends the same payload, so it only helps within the 30-second window. After an expiry, send the user back through your launch flow to get a fresh payload.
 
+Common causes:
+
+- **Request expired:** queues, batch jobs and cold starts can easily take 30 seconds. Encrypt in the same request that launches the PWA.
+- **Entity is not registered:** check that the `entity_id` belongs to the environment you are launching; staging values don't work in production, and the reverse.
+- **Unable to process the login request:** Base64-decode `encoded_key` and `encoded_iv` before use, rather than passing the Base64 strings to the cipher.
+
+For anything else, contact hlthstack through [hlthstack.io](https://www.hlthstack.io/) with the environment, your `slug`, the `entity_id` and the time of the failed launch. Never send `message`, `auth_tag`, the key or the IV.
+
 ## Embedding tips
 
 The PWA is a regular web app; it needs no SDK or JavaScript bridge from you. These settings let all of its features work inside a WebView.
@@ -295,6 +328,7 @@ The PWA is a regular web app; it needs no SDK or JavaScript bridge from you. The
 - Allow cookies for the hlthstack hosts, including cross-site cookies: the PWA talks to the hlthstack API on a different host with credentials.
 - Launch through SSO each time the user opens the embed. When a user signs out of your app, clear the WebView's cookies and web storage so the next person on the device does not inherit the session.
 - Hand non-web links to the operating system: `tel:`, `mailto:`, `upi:`, `intent:` and WhatsApp links are used for calls, email, UPI payments and support.
+- If you intercept navigations (`shouldOverrideUrlLoading` on Android, `decidePolicyFor navigationAction` on iOS), keep http(s) navigations to the hlthstack hosts inside the WebView, including the `302` that follows the launch `POST`. Otherwise the user never reaches the PWA.
 
 **Android WebView**
 
