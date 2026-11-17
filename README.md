@@ -2,6 +2,15 @@
 
 Embed the hlthstack web app inside your own app or website and sign your users in with single sign-on (SSO).
 
+**Resources**
+
+- **Encryption examples:** [Node.js](examples/node/encrypt.js) · [Python](examples/python/encrypt.py) · [Ruby](examples/ruby/encrypt.rb) · [Java](examples/java/HlthstackSso.java), ready to run with your staging key and IV (see [11. Examples](#11-examples)).
+- **Employer sign-in:** [SAML 2.0 single sign-on](docs/saml.md), when employees should sign in with their company account instead.
+- **REST API alongside the PWA:** the [API reference](https://developers.hlthstack.io), the [Postman docs](https://documenter.getpostman.com/view/32733686/2sBYHbrFjt) (with **Run in Postman**) and the [integration guide](https://github.com/hlthstack/integration-guide#guides).
+- **SDKs for the REST API:** [JavaScript](https://github.com/hlthstack/js) · [Python](https://github.com/hlthstack/python) · [Java](https://github.com/hlthstack/java).
+- **Registering members in advance:** [pre-registration](https://github.com/hlthstack/integration-guide/blob/main/docs/pre-registration.md), for entities where users are registered before their first launch.
+- **Messages and branding:** what members receive by email, WhatsApp and push in [product communications](https://github.com/hlthstack/integration-guide/blob/main/docs/product-communications.md), and sending them under your brand in [white-labelling](https://github.com/hlthstack/integration-guide/blob/main/docs/white-labelling.md).
+
 ## Contents
 
 1. [Overview](#1-overview)
