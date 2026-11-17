@@ -5,9 +5,15 @@ Employers can sign their employees into the hlthstack PWA with their own identit
 hlthstack is the SAML 2.0 service provider (SP). Employees sign in with their work account
 and land in the PWA at `pwa.hlthstack.io`; they never see an hlthstack password.
 
-This is a different flow from the [partner SSO](../README.md) in the main guide, which is for
-partners that launch the PWA from their own app with an encrypted payload. Use SAML when the
-employer's IdP should decide who gets in.
+> [!NOTE]
+> This is a different flow from the [partner SSO](../README.md) in the main guide, which is for
+> partners that launch the PWA from their own app with an encrypted payload. Use SAML when the
+> employer's IdP should decide who gets in.
+
+**On this page:** [How it works](#how-it-works) · [What to configure in your IdP](#what-to-configure-in-your-idp) ·
+[What to send hlthstack](#what-to-send-hlthstack) · [Who can sign in](#who-can-sign-in) ·
+[Testing on staging](#testing-on-staging) · [Troubleshooting](#troubleshooting) ·
+[Not supported yet](#not-supported-yet)
 
 ## How it works
 
@@ -25,10 +31,10 @@ sequenceDiagram
     H-->>U: Signed in, PWA home page
 ```
 
-- **SP-initiated:** employees open the sign-in link (below), for example from your intranet.
-  hlthstack sends them to your IdP and back.
-- **IdP-initiated:** employees click the hlthstack tile in your IdP's app dashboard. The IdP
-  posts straight to the ACS URL.
+| Flow | How the employee starts | What happens |
+|---|---|---|
+| **SP-initiated** | Opens the sign-in link (below), for example from your intranet. | hlthstack sends them to your IdP and back. |
+| **IdP-initiated** | Clicks the hlthstack tile in your IdP's app dashboard. | The IdP posts straight to the ACS URL. |
 
 Both work with the same IdP configuration.
 
@@ -38,6 +44,17 @@ hlthstack gives you a company slug for each environment. Replace `<company-slug>
 If your company is part of a group, the ACS URL uses the group's (parent company's) slug, which
 hlthstack also gives you; the sign-in link uses your own.
 hlthstack sends you the exact URLs at onboarding; use those if they differ.
+
+1. Create a SAML 2.0 app in your IdP (a separate one for staging; see
+   [Testing on staging](#testing-on-staging)).
+2. Set the SP entity ID and ACS URL from the [values table](#values) below.
+3. Use the HTTP-POST binding and sign the response, the assertion, or both.
+4. Set the Name ID to the employee's email address.
+5. Add the name and email [attributes](#attributes).
+6. Assign the groups or users who should get the app (see [Who can sign in](#who-can-sign-in)).
+7. [Send hlthstack](#what-to-send-hlthstack) your IdP's details.
+
+### Values
 
 | Setting (names vary by IdP) | Production | Staging |
 |---|---|---|
@@ -49,8 +66,9 @@ hlthstack sends you the exact URLs at onboarding; use those if they differ.
 | Name ID | The employee's email address | same |
 | Name ID format | Unspecified or Email address | same |
 
-Set the entity ID and ACS URL exactly as shown: hlthstack rejects responses whose audience or
-destination don't match, including a trailing slash or `http`.
+> [!WARNING]
+> Set the entity ID and ACS URL exactly as shown: hlthstack rejects responses whose audience or
+> destination don't match, including a trailing slash or `http`.
 
 ### Attributes
 
@@ -78,14 +96,20 @@ After you create the app in your IdP, send hlthstack, for each environment:
 | IdP signing certificate | X.509 certificate (Base64/PEM) that signs your responses |
 | IdP single logout URL (optional) | IdP metadata `SingleLogoutService` |
 
-Sending your IdP metadata XML file covers all of these. Send certificates and metadata through
-the channel hlthstack gives you, not in a public ticket. When you rotate the signing
-certificate, send the new one before you switch to it.
+> [!TIP]
+> Sending your IdP metadata XML file covers all of these.
+
+> [!CAUTION]
+> Send certificates and metadata through the channel hlthstack gives you, not in a public
+> ticket.
+
+> [!IMPORTANT]
+> When you rotate the signing certificate, send the new one before you switch to it.
 
 ## Who can sign in
 
-- If an employee isn't registered in hlthstack yet, hlthstack either creates their profile from the SAML attributes on first
-  sign-in, or shows a "not registered" message. Which one depends on your company's setup;
+- If an employee isn't registered in hlthstack yet, hlthstack either creates their profile from
+  the SAML attributes on first sign-in, or shows a "not registered" message. Which one depends on your company's setup;
   agree it with hlthstack at onboarding. To register employees in advance, use
   [pre-registration](https://github.com/hlthstack/integration-guide/blob/main/docs/pre-registration.md).
 - Use your IdP's app assignment (groups or users) to control who sees and can use the app.
@@ -108,15 +132,15 @@ quiet time: employees using the old sign-in link will need the new one.
 
 ## Troubleshooting
 
-| What you see | Likely cause |
-|---|---|
-| Your IdP shows an error before sign-in, mentioning the issuer, entity ID or reply URL | The SP entity ID or ACS URL in your IdP doesn't match the table above |
-| Sent back to a hlthstack error after signing in | Response not signed, signed with a certificate hlthstack doesn't have, or audience/destination mismatch |
-| "Not registered" message | The employee isn't registered in hlthstack and your company is set to registered-only |
-| Signed in as the wrong person, or a duplicate profile | The Name ID or `emailaddress` isn't the employee's work email |
-| Works from the IdP dashboard but not from the sign-in link (or the reverse) | Your IdP app allows only one of IdP-initiated or SP-initiated sign-in |
+| What you see | Likely cause | Fix |
+|---|---|---|
+| Your IdP shows an error before sign-in, mentioning the issuer, entity ID or reply URL | The SP entity ID or ACS URL in your IdP doesn't match the table above | Copy the [values](#values) exactly. |
+| Sent back to a hlthstack error after signing in | Response not signed, signed with a certificate hlthstack doesn't have, or audience/destination mismatch | Sign the response with the certificate you [sent hlthstack](#what-to-send-hlthstack), and check the entity ID and ACS URL. |
+| "Not registered" message | The employee isn't registered in hlthstack and your company is set to registered-only | Register the employee with [pre-registration](https://github.com/hlthstack/integration-guide/blob/main/docs/pre-registration.md). |
+| Signed in as the wrong person, or a duplicate profile | The Name ID or `emailaddress` isn't the employee's work email | Send the work email as the Name ID or `emailaddress`. |
+| Works from the IdP dashboard but not from the sign-in link (or the reverse) | Your IdP app allows only one of IdP-initiated or SP-initiated sign-in | Allow both in your IdP app. |
 
-Share the time of the attempt and the employee's email with hlthstack support.
+Still stuck? Share the time of the attempt and the employee's email with hlthstack support.
 
 ## Not supported yet
 

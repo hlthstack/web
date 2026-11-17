@@ -31,7 +31,12 @@ For employers who want their employees to sign in with their own identity provid
 
 The hlthstack PWA is a progressive web app that gives your users their health benefits: annual health checkups, lab tests, doctor consultations, pharmacy, mental wellness, dental and vision care, vaccinations and more. You can open it in a WebView inside your Android or iOS app, or in a browser tab from your website. Your users never see a login screen: your backend vouches for them with an encrypted, short-lived payload.
 
-**PWA or REST API?** Choose the PWA when you want every hlthstack service through one integration: you build no screens, and new features reach your users without changes on your side. Choose the REST API when you want your own screens and a native look and feel, and are ready to integrate each service yourself. Many partners use both.
+**PWA or REST API?** Many partners use both.
+
+| Choose | When you want |
+|---|---|
+| The PWA | Every hlthstack service through one integration: you build no screens, and new features reach your users without changes on your side. |
+| The REST API | Your own screens and a native look and feel, and are ready to integrate each service yourself. |
 
 For the REST API (bookings, benefits, webhooks and so on) see the [hlthstack integration guide](https://github.com/hlthstack/integration-guide), the [API reference](https://developers.hlthstack.io) and the [Postman docs](https://documenter.getpostman.com/view/32733686/2sBYHbrFjt). For hlthstack itself, see [hlthstack.io](https://www.hlthstack.io/).
 
@@ -48,7 +53,8 @@ hlthstack issues these per environment. Staging and production values are differ
 | `encoded_key` | Encryption | Base64. Decodes to a 32-byte AES-256 key. |
 | `encoded_iv` | Encryption | Base64. Decodes to the GCM IV (nonce). Use it exactly as issued. |
 
-Treat `encoded_key` and `encoded_iv` as secrets (see [Security notes](#security-notes)).
+> [!CAUTION]
+> Treat `encoded_key` and `encoded_iv` as secrets (see [Security notes](#security-notes)).
 
 ### What to ask hlthstack to confirm
 
@@ -85,7 +91,8 @@ sequenceDiagram
 4. **hlthstack replies with a `302` redirect** into the PWA's sign-in page. That page passes `message` and `auth_tag` to the hlthstack backend, which decrypts and validates them, finds or creates the user, and starts the session.
 5. **The PWA opens** the page named by `deeplink`, or its home page.
 
-The whole trip, from the moment you set `requested_at` until the PWA's sign-in page reaches the backend, must take **less than 30 seconds**. Encrypt just before launching. Never pre-generate, cache or reuse a payload.
+> [!IMPORTANT]
+> The whole trip, from the moment you set `requested_at` until the PWA's sign-in page reaches the backend, must take **less than 30 seconds**. Encrypt just before launching. Never pre-generate, cache or reuse a payload.
 
 <a id="environments"></a>
 ## 4. Environments
@@ -171,7 +178,10 @@ Each entry of `voluntary_plan_ids` is either a plan ID string, or an object:
 
 ### Deeplinks
 
-Set `deeplink` to one of these values to open a specific page. Any other value opens the home page. Not every page is available on every plan; ask hlthstack which are enabled for yours. Keep deeplink values in code or configuration rather than free text: a misspelt value is not reported, it just opens the home page.
+Set `deeplink` to one of these values to open a specific page. Any other value opens the home page. Not every page is available on every plan; ask hlthstack which are enabled for yours.
+
+> [!TIP]
+> Keep deeplink values in code or configuration rather than free text: a misspelt value is not reported, it just opens the home page.
 
 | Page | `deeplink` |
 |---|---|
@@ -266,7 +276,9 @@ Also check before you encrypt that `entity_id`, `requested_at` and `email` (or `
 <a id="launching-the-pwa"></a>
 ## 7. Launching the PWA
 
-```
+Send the user's browser or WebView to the launch URL with this form post:
+
+```http
 POST https://pwa.hlthstack.io/pwa-sso/<slug>
 Content-Type: application/x-www-form-urlencoded
 
@@ -291,6 +303,8 @@ Add `target="_blank"` to the form to open hlthstack in a new tab.
 
 ### From an Android WebView
 
+Post the form body with `postUrl`:
+
 ```kotlin
 val body = "message=" + URLEncoder.encode(message, "UTF-8") +
            "&auth_tag=" + URLEncoder.encode(authTag, "UTF-8")
@@ -298,6 +312,8 @@ webView.postUrl("https://pwa.hlthstack.io/pwa-sso/your-partner-slug", body.toByt
 ```
 
 ### From an iOS WKWebView
+
+Build a `POST` request with a form-encoded body and load it:
 
 ```swift
 var request = URLRequest(url: URL(string: "https://pwa.hlthstack.io/pwa-sso/your-partner-slug")!)
@@ -323,15 +339,17 @@ Generate `message` and `auth_tag` with one of the [examples](#examples) and post
 
 The PWA is a regular web app; it needs no SDK or JavaScript bridge from you. These settings let all of its features work inside a WebView.
 
-**Both platforms**
+### Both platforms
 
 - Enable JavaScript and DOM storage (`localStorage`). The session is kept in web storage and cookies; without them the user is signed out on every page load.
 - Allow cookies for the hlthstack hosts, including cross-site cookies: the PWA talks to the hlthstack API on a different host with credentials.
 - Launch through SSO each time the user opens the embed. When a user signs out of your app, clear the WebView's cookies and web storage so the next person on the device does not inherit the session.
 - Hand non-web links to the operating system: `tel:`, `mailto:`, `upi:`, `intent:` and WhatsApp links are used for calls, email, UPI payments and support.
-- If you intercept navigations (`shouldOverrideUrlLoading` on Android, `decidePolicyFor navigationAction` on iOS), keep http(s) navigations to the hlthstack hosts inside the WebView, including the `302` that follows the launch `POST`. Otherwise the user never reaches the PWA.
 
-**Android WebView**
+> [!WARNING]
+> If you intercept navigations (`shouldOverrideUrlLoading` on Android, `decidePolicyFor navigationAction` on iOS), keep http(s) navigations to the hlthstack hosts inside the WebView, including the `302` that follows the launch `POST`. Otherwise the user never reaches the PWA.
+
+### Android WebView
 
 - `settings.javaScriptEnabled = true`, `settings.domStorageEnabled = true`, and `CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)`.
 - Camera and microphone are used for video consultations, voice input and QR scanning. Request `CAMERA` and `RECORD_AUDIO` at runtime and grant them in `WebChromeClient.onPermissionRequest`.
@@ -340,13 +358,13 @@ The PWA is a regular web app; it needs no SDK or JavaScript bridge from you. The
 - Links that open a new window (`target="_blank"`, `window.open`), such as external sites and documents, need `setSupportMultipleWindows(true)` with `onCreateWindow`, or open them in a Custom Tab. Route non-http(s) schemes to an `Intent` in `shouldOverrideUrlLoading`.
 - Some documents are downloaded as files; set a `DownloadListener`.
 
-**iOS WKWebView**
+### iOS WKWebView
 
 - Add `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, `NSPhotoLibraryUsageDescription` and `NSLocationWhenInUseUsageDescription` to `Info.plist`.
 - Set `configuration.allowsInlineMediaPlayback = true` for video consultations, and on iOS 15+ implement `WKUIDelegate.webView(_:requestMediaCapturePermissionFor:...)`.
 - Implement `WKUIDelegate.webView(_:createWebViewWith:for:windowFeatures:)` so `window.open` and `target="_blank"` links open (for example in `SFSafariViewController`), and open non-http(s) schemes with `UIApplication.shared.open` from `decidePolicyFor navigationAction`.
 
-**Browser or new tab**
+### Browser or new tab
 
 No extra setup is needed. Post the launch form from your page (see [From a website](#from-a-website)); add `target="_blank"` for a new tab.
 
@@ -355,28 +373,23 @@ No extra setup is needed. Post the launch form from your page (see [From a websi
 
 The launch endpoint always answers with the `302` redirect. Validation happens when the PWA's sign-in page sends the payload on to the hlthstack backend, so failures are shown to the user on that page, together with a **Try again** button. Your server does not receive the error. Use staging to test each case below.
 
-| Cause | Message shown |
-|---|---|
-| `message` or `auth_tag` missing | Missing params for requested resource |
-| Unknown `slug`, or no entity set up for it yet | Requested resource cannot be found |
-| Decryption failed: wrong key or IV, wrong environment, `message` or `auth_tag` altered or truncated (for example a `+` sent unencoded in the form body), or the plaintext is not valid JSON | Unable to process the login request, please contact your HR. |
-| `requested_at` missing, or more than 30 seconds old when the PWA reached the backend | Request expired. Please try again |
-| `entity_id` unknown, or registered under a different `slug` | Entity is not registered … Please contact support team |
-| Pre-registration-only entity and no active registered user matches `email` or `member_id` | Customer is not registered … Please contact partner |
-| The user could not be created (for example, invalid data) | The validation message |
-| `selected_plan` is not a string | selected_plan must be a string |
-| `selected_plan` is not one of the user's active plans | Selected plan not found |
-| Anything else | Something went wrong |
+| Cause | What the user sees | Fix |
+|---|---|---|
+| `message` or `auth_tag` missing | Missing params for requested resource | Send both as form fields. |
+| Unknown `slug`, or no entity set up for it yet | Requested resource cannot be found | Check the `slug` for this environment. |
+| Decryption failed: wrong key or IV, wrong environment, `message` or `auth_tag` altered or truncated (for example a `+` sent unencoded in the form body), or the plaintext is not valid JSON | Unable to process the login request, please contact your HR. | Base64-decode `encoded_key` and `encoded_iv` before use, rather than passing the Base64 strings to the cipher. URL-encode both values in the form body. |
+| `requested_at` missing, or more than 30 seconds old when the PWA reached the backend | Request expired. Please try again | Queues, batch jobs and cold starts can easily take 30 seconds. Encrypt in the same request that launches the PWA. |
+| `entity_id` unknown, or registered under a different `slug` | Entity is not registered … Please contact support team | Check that the `entity_id` belongs to the environment you are launching; staging values don't work in production, and the reverse. |
+| Pre-registration-only entity and no active registered user matches `email` or `member_id` | Customer is not registered … Please contact partner | Register the user first (see [How the user is matched](#how-the-user-is-matched)). |
+| The user could not be created (for example, invalid data) | The validation message | Correct the payload data. |
+| `selected_plan` is not a string | selected_plan must be a string | Send `selected_plan` as a string. |
+| `selected_plan` is not one of the user's active plans | Selected plan not found | Send one of the user's active plan IDs. |
+| Anything else | Something went wrong | [Contact hlthstack](#contacting-hlthstack). |
 
 ### Try again
 
-**Try again** resends the same payload, so it only helps within the 30-second window. After an expiry, send the user back through your launch flow to get a fresh payload.
-
-### Common causes
-
-- **Request expired:** queues, batch jobs and cold starts can easily take 30 seconds. Encrypt in the same request that launches the PWA.
-- **Entity is not registered:** check that the `entity_id` belongs to the environment you are launching; staging values don't work in production, and the reverse.
-- **Unable to process the login request:** Base64-decode `encoded_key` and `encoded_iv` before use, rather than passing the Base64 strings to the cipher.
+> [!NOTE]
+> **Try again** resends the same payload, so it only helps within the 30-second window. After an expiry, send the user back through your launch flow to get a fresh payload.
 
 ### Contacting hlthstack
 
